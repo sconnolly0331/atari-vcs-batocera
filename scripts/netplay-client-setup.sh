@@ -1,6 +1,6 @@
 #!/bin/bash
-# Drop this on the second machine and run it as root.
-# Detects Batocera vs RetroPie and applies correct client netplay config.
+# Run this on the second machine (Pi, VCS, etc.) to configure it as a netplay client.
+# Detects Batocera, RetroPie, or bare RetroArch automatically.
 
 HOST_IP="192.168.68.57"
 HOST_PORT="55435"
@@ -10,7 +10,7 @@ echo "=== Netplay Client Setup ==="
 echo "Host: $HOST_IP:$HOST_PORT"
 echo ""
 
-# ── Detect platform ──────────────────────────────────────────────────────────
+# ── Detect platform ───────────────────────────────────────────────────────────
 if grep -qi "batocera" /etc/os-release 2>/dev/null; then
     PLATFORM="batocera"
 elif [ -f /opt/retropie/configs/all/retroarch.cfg ]; then
@@ -24,14 +24,10 @@ fi
 echo "Detected platform: $PLATFORM"
 echo ""
 
-# ── Batocera ─────────────────────────────────────────────────────────────────
+# ── Batocera ──────────────────────────────────────────────────────────────────
 if [ "$PLATFORM" = "batocera" ]; then
     CONF="/userdata/system/batocera.conf"
-    
-    # Remove any existing netplay lines
     sed -i '/^global\.netplay\./d' "$CONF"
-    
-    # Append client config
     cat >> "$CONF" << EOF
 
 ## Netplay — LAN client (connects to $HOST_IP)
@@ -42,23 +38,22 @@ global.netplay.public_announce=0
 global.netplay.server.ip=$HOST_IP
 global.netplay.server.port=$HOST_PORT
 EOF
-    
     echo "✓ Written to $CONF"
-    echo "  Restart EmulationStation to apply, then:"
-    echo "  Long-press a game → Start Netplay as Client"
+    echo "  Restart EmulationStation, then long-press a game → Start Netplay as Client"
 
-# ── RetroPie ─────────────────────────────────────────────────────────────────
+# ── RetroPie ──────────────────────────────────────────────────────────────────
 elif [ "$PLATFORM" = "retropie" ]; then
     CONF="/opt/retropie/configs/all/retroarch.cfg"
-    
-    # Remove old netplay lines
+
+    # Remove any existing netplay lines
     sed -i '/^netplay_/d' "$CONF"
-    
-    # Append netplay client defaults
+
+    # Append client config
     cat >> "$CONF" << EOF
 
 # Netplay — LAN client
 netplay_nickname = "$PLAYER_NAME"
+netplay_ip_address = "$HOST_IP"
 netplay_ip_port = "$HOST_PORT"
 netplay_delay_frames = "0"
 netplay_public_announce = "false"
@@ -66,11 +61,10 @@ EOF
 
     echo "✓ Written to $CONF"
     echo ""
-    echo "To join a game from RetroPie:"
-    echo "  In RetroArch: Settings → Netplay → Start Netplay as Client"
-    echo "  Enter host IP: $HOST_IP   Port: $HOST_PORT"
+    echo "To join a netplay session:"
+    echo "  In EmulationStation: long-press a game → Start Netplay as Client"
     echo ""
-    echo "  OR from the command line:"
+    echo "  Or from terminal:"
     echo "  retroarch --connect $HOST_IP --port $HOST_PORT -L /path/to/core.so /path/to/rom"
 
 # ── Generic RetroArch ─────────────────────────────────────────────────────────
@@ -82,33 +76,29 @@ elif [ "$PLATFORM" = "retroarch" ]; then
 
 # Netplay — LAN client
 netplay_nickname = "$PLAYER_NAME"
+netplay_ip_address = "$HOST_IP"
 netplay_ip_port = "$HOST_PORT"
 netplay_delay_frames = "0"
 netplay_public_announce = "false"
 EOF
     echo "✓ Written to $CONF"
 
+# ── Unknown ───────────────────────────────────────────────────────────────────
 else
     echo "Could not detect platform. Apply manually:"
     echo ""
-    echo "For Batocera — add to /userdata/system/batocera.conf:"
-    echo "  global.netplay.nickname=$PLAYER_NAME"
-    echo "  global.netplay.port=$HOST_PORT"
-    echo "  global.netplay.frames=0"
-    echo "  global.netplay.server.ip=$HOST_IP"
-    echo "  global.netplay.server.port=$HOST_PORT"
-    echo ""
     echo "For RetroPie — add to /opt/retropie/configs/all/retroarch.cfg:"
     echo "  netplay_nickname = \"$PLAYER_NAME\""
+    echo "  netplay_ip_address = \"$HOST_IP\""
     echo "  netplay_ip_port = \"$HOST_PORT\""
     echo "  netplay_delay_frames = \"0\""
+    echo "  netplay_public_announce = \"false\""
 fi
 
 echo ""
 echo "=== ROM sharing ==="
-echo "Mount the game library from this machine:"
+echo "Mount the game library from the VCS:"
 echo "  sudo mkdir -p /mnt/batocera"
 echo "  sudo mount -t cifs //192.168.68.57/share /mnt/batocera -o guest,uid=1000"
-echo "  (or browse \\\\\\\\192.168.68.57\\\\share in your file manager)"
 echo ""
 echo "Done."
